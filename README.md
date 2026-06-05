@@ -50,3 +50,10 @@ Task-specific response generator
 Action card generator
   ↓
 Optional session summary/export
+
+## Running with Claude Assist
+
+Anchor can run as a local-first agent without any LLM provider. Claude Assist is optional and only runs when the user explicitly clicks **Deepen with Claude**.
+
+For local Claude testing:
+

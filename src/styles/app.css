@@ -973,3 +973,13 @@ body {
     0 0 46px rgba(216, 194, 161, 0.035),
     inset 0 1px 0 rgba(255, 255, 255, 0.085);
 }
+
+.version-pill {
+  padding: 7px 10px;
+  border-radius: 999px;
+  color: #d8d2c9 !important;
+  font-size: 0.76rem !important;
+  font-weight: 800;
+  border: 1px solid rgba(255, 255, 255, 0.065);
+  background: rgba(255, 255, 255, 0.04);
+}

@@ -64,6 +64,7 @@ function App() {
         </div>
 
         <div className="topbar-actions">
+          <span className="version-pill">v0.2 Claude</span>
           <span>{conversationCount} turns</span>
           <button onClick={handleReset}>Reset</button>
         </div>
