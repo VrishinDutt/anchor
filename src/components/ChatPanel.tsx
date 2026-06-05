@@ -8,7 +8,7 @@ type ChatPanelProps = {
 
 const samplePrompts = [
   {
-    label: "IAI project",
+    label: "Project",
     prompt:
       "For my IAI AAT I need to build a chatbot-esque AI agent app with report, PPT, and demo. I don't want it to be a glorified ChatGPT wrapper. It should preserve user agency, use metacognition, and remain non-therapeutic.",
   },
@@ -46,46 +46,40 @@ export function ChatPanel({ messages, onSend }: ChatPanelProps) {
   }
 
   return (
-    <section className="chat-panel">
-      <div className="chat-scroll">
+    <section className="thread-card">
+      <div className="thread-scroll">
         {messages.map((message, index) => (
-          <article key={index} className={`message ${message.role}`}>
-            <p className="message-role">{message.role === "agent" ? "Anchor" : "You"}</p>
+          <article key={index} className={`bubble ${message.role}`}>
+            <span>{message.role === "agent" ? "Anchor" : "You"}</span>
             <p>{message.content}</p>
           </article>
         ))}
       </div>
 
-      <div className="composer-zone">
-        <form className="composer" onSubmit={handleSubmit}>
-          <textarea
-            value={input}
-            onChange={(event) => setInput(event.target.value)}
-            placeholder="Bring the thread here. Anchor will help you hold it without taking the wheel."
-            rows={3}
-          />
-          <button type="submit">Anchor</button>
-        </form>
+      <form className="clean-composer" onSubmit={handleSubmit}>
+        <textarea
+          value={input}
+          onChange={(event) => setInput(event.target.value)}
+          placeholder="What thread do you want to hold?"
+          rows={2}
+        />
+        <button type="submit">Send</button>
+      </form>
 
-        <div className="demo-thread-row">
-          <button
-            type="button"
-            className="demo-thread-toggle"
-            onClick={() => setShowSamples((current) => !current)}
-          >
-            {showSamples ? "Hide demo threads" : "Demo threads"}
-          </button>
+      <div className="tiny-demo-row">
+        <button type="button" onClick={() => setShowSamples((current) => !current)}>
+          {showSamples ? "Hide demos" : "Demo threads"}
+        </button>
 
-          {showSamples && (
-            <div className="demo-thread-chips">
-              {samplePrompts.map((sample) => (
-                <button key={sample.label} onClick={() => sendSample(sample.prompt)}>
-                  {sample.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        {showSamples && (
+          <div>
+            {samplePrompts.map((sample) => (
+              <button key={sample.label} onClick={() => sendSample(sample.prompt)}>
+                {sample.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );

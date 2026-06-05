@@ -9,23 +9,20 @@ import {
   type ChatMessage,
   type Mode,
 } from "./agent/anchorEngine";
-import { ModeRail } from "./components/ModeRail";
 import { ChatPanel } from "./components/ChatPanel";
-import { AgencyPanel } from "./components/AgencyPanel";
-import { ActionCard } from "./components/ActionCard";
-import { SummaryPanel } from "./components/SummaryPanel";
-import { LlmAssistPanel } from "./components/LlmAssistPanel";
+import { FocusPanel } from "./components/FocusPanel";
+import { DetailDrawer } from "./components/DetailDrawer";
 
 const initialMessages: ChatMessage[] = [
   {
     role: "agent",
     content:
-      "I am Anchor. Bring me the thing that feels scattered, heavy, or too easy to outsource. I will help you hold the thread without taking the wheel.",
+      "Bring me the thing that feels scattered, heavy, or too easy to outsource. I’ll help you hold the thread without taking the wheel.",
   },
 ];
 
 function App() {
-  const [mode, setMode] = useState<Mode>("auto");
+  const [mode] = useState<Mode>("auto");
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [session, setSession] = useState<AnchorSession>(createInitialSession());
   const [latestResult, setLatestResult] = useState<AnchorResult>(createInitialResult());
@@ -53,45 +50,37 @@ function App() {
   }
 
   function handleReset() {
-    setMode("auto");
     setMessages(initialMessages);
     setSession(createInitialSession());
     setLatestResult(createInitialResult());
   }
 
   return (
-    <main className="app-shell">
-      <section className="hero-panel">
+    <main className="app-shell minimal-shell">
+      <section className="topbar">
         <div>
-          <p className="eyebrow">Metacognitive AI Agent</p>
-          <h1>Anchor</h1>
-          <p className="tagline">
-            A quiet place to hold the thread.
-          </p>
+          <p className="eyebrow">Anchor</p>
+          <h1>Hold the thread.</h1>
         </div>
 
-        <div className="hero-actions">
-          <div className="session-pill">
-            <span>{conversationCount}</span>
-            <p>user turns</p>
-          </div>
-
-          <button className="reset-button" onClick={handleReset}>
-            Reset
-          </button>
+        <div className="topbar-actions">
+          <span>{conversationCount} turns</span>
+          <button onClick={handleReset}>Reset</button>
         </div>
       </section>
 
-      <section className="workspace">
-        <ModeRail activeMode={mode} onModeChange={setMode} />
-
+      <section className="minimal-workspace">
         <ChatPanel messages={messages} onSend={handleSend} />
 
-        <aside className="side-stack">
-          <AgencyPanel result={latestResult} session={session} />
-          <ActionCard action={latestResult.actionCard} />
-          <LlmAssistPanel latestResult={latestResult} lastUserInput={lastUserInput} />
-          <SummaryPanel messages={messages} latestResult={latestResult} />
+        <aside className="right-rail">
+          <FocusPanel result={latestResult} session={session} />
+
+          <DetailDrawer
+            latestResult={latestResult}
+            session={session}
+            messages={messages}
+            lastUserInput={lastUserInput}
+          />
         </aside>
       </section>
     </main>
