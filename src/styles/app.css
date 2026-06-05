@@ -622,3 +622,112 @@ h1 {
 .composer button:hover {
   background: #e1c39a;
 }
+
+.llm-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.llm-policy-card {
+  padding: 13px;
+  border-radius: 18px;
+  background: rgba(0, 0, 0, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.055);
+}
+
+.llm-policy-card span {
+  display: inline-block;
+  margin-bottom: 6px;
+  color: #b9aa98;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.llm-policy-card strong {
+  display: block;
+  margin-bottom: 8px;
+  color: #f3eee6;
+  font-size: 0.96rem;
+}
+
+.llm-policy-card p {
+  margin: 0;
+  color: #d8ccbd;
+  font-size: 0.82rem;
+  line-height: 1.42;
+}
+
+.llm-draft {
+  max-height: 220px;
+  overflow: auto;
+  padding: 13px;
+  border-radius: 18px;
+  background: rgba(216, 181, 132, 0.075);
+  border: 1px solid rgba(216, 181, 132, 0.14);
+}
+
+.llm-draft.error {
+  background: rgba(180, 64, 64, 0.08);
+  border-color: rgba(180, 64, 64, 0.2);
+}
+
+.llm-draft p {
+  margin: 0;
+  white-space: pre-wrap;
+  color: #e8ddcf;
+  font-size: 0.84rem;
+  line-height: 1.48;
+}
+
+.llm-error-detail {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.llm-error-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.llm-error-detail-header span {
+  color: #b9aa98;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.llm-error-detail textarea {
+  width: 100%;
+  min-height: 132px;
+  resize: vertical;
+  color: #f4eadc;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  outline: none;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.copy-button.compact {
+  width: auto;
+  height: 30px;
+  margin-top: 0;
+  padding: 0 12px;
+  font-size: 0.76rem;
+}
+
+.details-toggle:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

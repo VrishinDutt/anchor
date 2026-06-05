@@ -1,6 +1,8 @@
 import { parseTask, type ParsedTask } from "./taskParser";
 import { generateTaskSpecificReply } from "./taskResponseGenerator";
 import { inferActionCardFromReply } from "./actionCardLogic";
+import { decideLlmUse } from "./llm/llmPolicy";
+import type { LlmPolicyDecision } from "./llm/llmTypes";
 export type Mode =
   | "auto"
   | "clarify"
@@ -75,6 +77,7 @@ export type AnchorResult = {
   actionCard: ActionCard;
   trace: AgentTrace;
   parsedTask: ParsedTask;
+  llmPolicy: LlmPolicyDecision;
 };
 
 export function createInitialSession(): AnchorSession {
@@ -119,6 +122,11 @@ export function createInitialResult(): AnchorResult {
       userGoal: "Clarify the problem and identify the next grounded action.",
       inferredMode: "auto",
     },
+    llmPolicy: {
+      permission: "scaffold-only",
+      useCase: "summarize",
+      reason: "No user input yet.",
+    },
   };
 }
 
@@ -141,6 +149,15 @@ export function runAnchorEngine(
   const responsePolicy = choosePolicy(detectedMode, cognitiveState, agencyRisk, normalized);
   const loopStage = chooseLoopStage(responsePolicy, cognitiveState, agencyRisk, session);
   const trace = buildTrace(normalized, detectedMode, cognitiveState, agencyRisk, responsePolicy);
+  const llmPolicy = decideLlmUse({
+    userInput: input,
+    task: effectiveTask,
+    agencyRisk,
+    cognitiveState,
+    responsePolicy,
+    turnCount: session.turnCount,
+  });
+
   const reply = generateTaskSpecificReply({
     input,
     task: effectiveTask,
@@ -164,6 +181,7 @@ export function runAnchorEngine(
       generateActionCard(detectedMode, cognitiveState, agencyRisk, loopStage),
     trace,
     parsedTask: effectiveTask,
+    llmPolicy,
   };
 
   return {

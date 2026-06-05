@@ -14,6 +14,7 @@ import { ChatPanel } from "./components/ChatPanel";
 import { AgencyPanel } from "./components/AgencyPanel";
 import { ActionCard } from "./components/ActionCard";
 import { SummaryPanel } from "./components/SummaryPanel";
+import { LlmAssistPanel } from "./components/LlmAssistPanel";
 
 const initialMessages: ChatMessage[] = [
   {
@@ -33,6 +34,10 @@ function App() {
     () => messages.filter((message) => message.role === "user").length,
     [messages]
   );
+
+  const lastUserInput = useMemo(() => {
+    return [...messages].reverse().find((message) => message.role === "user")?.content ?? "";
+  }, [messages]);
 
   function handleSend(input: string) {
     const { result, session: updatedSession } = runAnchorEngine(input, mode, session);
@@ -85,6 +90,7 @@ function App() {
         <aside className="side-stack">
           <AgencyPanel result={latestResult} session={session} />
           <ActionCard action={latestResult.actionCard} />
+          <LlmAssistPanel latestResult={latestResult} lastUserInput={lastUserInput} />
           <SummaryPanel messages={messages} latestResult={latestResult} />
         </aside>
       </section>
