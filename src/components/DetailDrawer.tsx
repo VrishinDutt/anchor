@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { generateSessionSummary } from "../agent/sessionSummary";
 import { exportTextFile } from "../agent/exportSession";
 import { getProviderStatus, runLlmDraft } from "../agent/llm/llmClient";
@@ -247,19 +247,39 @@ export function DetailDrawer({
       )}
 
       <DrawerButton
-        title="Ethics"
-        subtitle="Non-clinical, non-replacement"
+        title="About / Ethics"
+        subtitle="Agency, Claude, diagnostics"
         active={open === "ethics"}
         onClick={() => toggle("ethics")}
       />
 
       {open === "ethics" && (
-        <div className="drawer-panel">
+        <div className="drawer-panel about-panel">
           <p className="drawer-muted">
-            Anchor is not a therapist, diagnosis tool, crisis system, or replacement
-            for human support. Its job is narrower: preserve agency, clarify the
-            thread, and help you take one grounded step.
+            Anchor helps users use AI without surrendering agency.
           </p>
+
+          <InfoBlock label="What Anchor is">
+            Anchor is a metacognitive agent, not a generic LLM wrapper. It names
+            the task, preserves constraints, checks agency risk, and keeps the
+            user responsible for real-world action.
+          </InfoBlock>
+
+          <InfoBlock label="What Anchor is not">
+            Anchor is not therapy, diagnosis, crisis support, or a replacement
+            for human judgment, teachers, teammates, clinicians, or real-world
+            follow-through.
+          </InfoBlock>
+
+          <InfoBlock label="Claude assist">
+            Claude is optional and only runs when explicitly invoked. Provider
+            Health Check helps diagnose local API setup without exposing API keys.
+          </InfoBlock>
+
+          <InfoBlock label="Transparency">
+            The Reasoning drawer shows why Anchor chose a response, including
+            the detected intent, agency posture, evidence, and planned next step.
+          </InfoBlock>
         </div>
       )}
     </section>
@@ -296,6 +316,15 @@ function FeatureScore({ label, value }: { label: string; value: number }) {
       <div className="feature-track">
         <div className="feature-fill" style={{ width: `${pct}%` }} />
       </div>
+    </div>
+  );
+}
+
+function InfoBlock({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="reason-block">
+      <span>{label}</span>
+      <p>{children}</p>
     </div>
   );
 }

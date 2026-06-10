@@ -12,6 +12,15 @@ Most AI assistants reduce friction by immediately giving answers. Anchor takes a
 
 Anchor helps users clarify loaded tasks, detect possible false mastery, preserve project boundaries, and move toward one grounded next action.
 
+## Product Philosophy
+
+- **Local-first reasoning:** Anchor's core task parsing, cognitive framing, agency checks, response planning, and action cards run locally before any optional provider is involved.
+- **Optional Claude:** Claude Assist is a subordinate language support path. It only runs when the user explicitly clicks **Deepen with Claude**.
+- **Agency checkpoints:** When a prompt looks like wholesale outsourcing, Anchor slows down and asks the user to state intent, constraints, or understanding before expanding an artifact.
+- **Debug / recovery mode:** Failure-oriented prompts should produce practical recovery steps, exact-error awareness, and a next action instead of vague reassurance.
+- **Provider health diagnostics:** Provider Health Check shows local provider and key-presence status without exposing API keys.
+- **Reasoning drawer visibility:** The Reasoning drawer exposes the detected intent, hypothesis, evidence, policy posture, and planned next action so the user can inspect why Anchor responded that way.
+
 ## Current Prototype Features
 
 - Tauri + React + TypeScript desktop app

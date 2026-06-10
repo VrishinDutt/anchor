@@ -115,7 +115,7 @@ export function createInitialResult(): AnchorResult {
     responsePolicy: "clarify-then-assist",
     loopStage: "notice",
     reply:
-      "I am Anchor. Bring me the thing that feels scattered, heavy, or too easy to outsource. I will help you hold the thread without taking the wheel.",
+      "I am Anchor. Bring me the thing that feels scattered, heavy, or too easy to outsource. I will help you hold the thread without taking the wheel.\n\nStart with a task, failure, decision, or artifact you want to hold.",
     actionCard: {
       title: "Start with one honest sentence",
       steps: [

@@ -17,7 +17,7 @@ const initialMessages: ChatMessage[] = [
   {
     role: "agent",
     content:
-      "Bring me the thing that feels scattered, heavy, or too easy to outsource. I’ll help you hold the thread without taking the wheel.",
+      "Bring me the thing that feels scattered, heavy, or too easy to outsource. I’ll help you hold the thread without taking the wheel.\n\nStart with a task, failure, decision, or artifact you want to hold.",
   },
 ];
 
