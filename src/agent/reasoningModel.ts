@@ -1,5 +1,6 @@
 import type { ParsedTask } from "./taskParser";
 import type { AnchorFeatures } from "./featureEngineering";
+import type { InputFrame } from "./inputFrame";
 
 export type AnchorHypothesis =
   | "needs_clarification"
@@ -32,39 +33,48 @@ const includesAny = (text: string, terms: string[]) =>
 
 export function scoreHypotheses(
   features: AnchorFeatures,
-  parsedTask: ParsedTask
+  parsedTask: ParsedTask,
+  frame?: InputFrame
 ): HypothesisScore[] {
   const text = taskText(parsedTask);
 
-  const hasDecisionSignal = includesAny(text, [
-    "decide",
-    "decision",
-    "choose",
-    "priority",
-    "first",
-    "which",
-    "or",
-  ]);
+  const hasDecisionSignal =
+    Boolean(frame?.isDecisionRequest) ||
+    includesAny(text, [
+      "decide",
+      "decision",
+      "choose",
+      "priority",
+      "first",
+      "which",
+    ]);
 
-  const hasLanguageSignal = includesAny(text, [
-    "refine",
-    "rewrite",
-    "wording",
-    "problem statement",
-    "abstract",
-    "improve",
-    "polish",
-  ]);
+  const hasLanguageSignal =
+    Boolean(frame?.isRefinementRequest) ||
+    includesAny(text, [
+      "refine",
+      "rewrite",
+      "wording",
+      "problem statement",
+      "abstract",
+      "improve",
+      "polish",
+    ]);
 
-  const hasDebugSignal = includesAny(text, [
-    "error",
-    "bug",
-    "traceback",
-    "not working",
-    "failed",
-    "fix",
-    "crash",
-  ]);
+  const hasDebugSignal =
+    Boolean(frame?.isDebugging) ||
+    includesAny(text, [
+      "error",
+      "bug",
+      "traceback",
+      "not working",
+      "failed",
+      "fix",
+      "crash",
+    ]);
+
+  const hasLlmProviderSignal = Boolean(frame?.isLlmProviderIssue);
+  const hasCasualFailureSignal = Boolean(frame?.isCasualFailure);
 
   const scores: HypothesisScore[] = [
     {
@@ -97,7 +107,12 @@ export function scoreHypotheses(
     },
     {
       hypothesis: "needs_decision_support",
-      score: clamp01((hasDecisionSignal ? 0.55 : 0) + features.uncertainty * 0.25 + features.cognitiveLoad * 0.2),
+      score: clamp01(
+        (hasDecisionSignal ? 0.55 : 0) +
+          features.uncertainty * 0.2 +
+          features.cognitiveLoad * 0.15 -
+          (hasDebugSignal ? 0.45 : 0)
+      ),
       reasons: [
         "The request appears to involve choosing between options.",
         "A transparent decision lens is more useful than a generic answer.",
@@ -121,10 +136,20 @@ export function scoreHypotheses(
     },
     {
       hypothesis: "needs_debugging_help",
-      score: clamp01((hasDebugSignal ? 0.75 : 0) + features.actionability * 0.15 + features.uncertainty * 0.1),
+      score: clamp01(
+        (hasDebugSignal ? 0.72 : 0) +
+          (hasLlmProviderSignal ? 0.22 : 0) +
+          (hasCasualFailureSignal ? 0.12 : 0) +
+          features.actionability * 0.08 +
+          features.uncertainty * 0.08
+      ),
       reasons: [
-        "The request appears to involve an error, bug, or broken behavior.",
-        "Debugging should proceed through concrete checks.",
+        hasLlmProviderSignal
+          ? "The request points to an LLM/provider integration issue."
+          : "The request appears to involve an error, bug, or broken behavior.",
+        hasCasualFailureSignal
+          ? "The user is reporting failure casually, so respond directly without over-formal scaffolding."
+          : "Debugging should proceed through concrete checks.",
       ],
     },
     {

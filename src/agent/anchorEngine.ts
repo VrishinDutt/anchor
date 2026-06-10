@@ -5,6 +5,7 @@ import { decideLlmUse } from "./llm/llmPolicy";
 import { extractAnchorFeatures, type AnchorFeatures } from "./featureEngineering";
 import { scoreHypotheses, selectBestHypothesis, type HypothesisScore } from "./reasoningModel";
 import { createResponsePlan, type ResponsePlan } from "./responsePlanner";
+import { buildInputFrame } from "./inputFrame";
 import type { LlmPolicyDecision } from "./llm/llmTypes";
 export type Mode =
   | "auto"
@@ -172,6 +173,7 @@ export function runAnchorEngine(
 ): { result: AnchorResult; session: AnchorSession } {
   const normalized = normalize(input);
   const parsedTask = parseTask(input, selectedMode);
+  const frame = buildInputFrame(input, Boolean(session.activeTask));
   const isCheckpointContinuation =
     Boolean(session.awaitingCheckpoint && session.activeTask && normalized.length > 0);
   const isActiveTaskFollowUp =
@@ -179,7 +181,7 @@ export function runAnchorEngine(
   const effectiveTask =
     isCheckpointContinuation || isActiveTaskFollowUp ? session.activeTask! : parsedTask;
   const features = extractAnchorFeatures(input, effectiveTask, session);
-  const hypothesisScores = scoreHypotheses(features, effectiveTask);
+  const hypothesisScores = scoreHypotheses(features, effectiveTask, frame);
   const hypothesis = selectBestHypothesis(hypothesisScores);
   const responsePlan = createResponsePlan(hypothesis, features, effectiveTask);
   const detectedMode = selectedMode === "auto" ? effectiveTask.inferredMode : selectedMode;

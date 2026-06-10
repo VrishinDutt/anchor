@@ -91,6 +91,28 @@ export function composePlannedReply(params: {
     }
 
     case "needs_debugging_help": {
+      const text = params.input.toLowerCase();
+
+      if (
+        text.includes("claude") ||
+        text.includes("llm") ||
+        text.includes("deepen") ||
+        text.includes("anthropic")
+      ) {
+        return [
+          "Got it — this is a provider/debugging issue, not a decision problem.",
+          "We should not change the agent logic yet. First isolate whether Claude is failing because of environment, Tauri bridge, API key, or the provider call.",
+          "",
+          "Check in this order:",
+          "1. Confirm the app is running through `npm run tauri dev`, not browser-only Vite.",
+          "2. Confirm `ANTHROPIC_API_KEY` is set in the same Terminal session.",
+          "3. Try the Claude button once and copy the exact error shown in the drawer.",
+          "4. If there is no drawer error, inspect the Rust/Tauri terminal output.",
+          "",
+          "Next move: paste the exact Claude error text here.",
+        ].join("\n");
+      }
+
       return [
         "This should be handled as a debugging path, not as a redesign.",
         "The mistake would be changing too many layers before we know what failed.",
