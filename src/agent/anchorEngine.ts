@@ -1,7 +1,10 @@
 import { parseTask, type ParsedTask } from "./taskParser";
 import { generateTaskSpecificReply } from "./taskResponseGenerator";
-import { inferActionCardFromReply } from "./actionCardLogic";
+import { inferActionCardFromPlan, inferActionCardFromReply } from "./actionCardLogic";
 import { decideLlmUse } from "./llm/llmPolicy";
+import { extractAnchorFeatures, type AnchorFeatures } from "./featureEngineering";
+import { scoreHypotheses, selectBestHypothesis, type HypothesisScore } from "./reasoningModel";
+import { createResponsePlan, type ResponsePlan } from "./responsePlanner";
 import type { LlmPolicyDecision } from "./llm/llmTypes";
 export type Mode =
   | "auto"
@@ -77,6 +80,10 @@ export type AnchorResult = {
   actionCard: ActionCard;
   trace: AgentTrace;
   parsedTask: ParsedTask;
+  features: AnchorFeatures;
+  hypothesis: HypothesisScore;
+  hypothesisScores: HypothesisScore[];
+  responsePlan: ResponsePlan;
   llmPolicy: LlmPolicyDecision;
 };
 
@@ -122,6 +129,34 @@ export function createInitialResult(): AnchorResult {
       userGoal: "Clarify the problem and identify the next grounded action.",
       inferredMode: "auto",
     },
+    features: {
+      intentClarity: 0,
+      artifactPressure: 0,
+      agencyRisk: 0,
+      cognitiveLoad: 0,
+      taskSpecificity: 0,
+      ownershipSignal: 0,
+      continuationSignal: 0,
+      reflectionNeed: 0,
+      actionability: 0,
+      uncertainty: 0,
+    },
+    hypothesis: {
+      hypothesis: "healthy_progress",
+      score: 0,
+      reasons: ["Initial state before user input."],
+    },
+    hypothesisScores: [],
+    responsePlan: {
+      hypothesis: "healthy_progress",
+      stance: "direct",
+      shouldAskQuestion: false,
+      allowedDepth: "micro",
+      userWorkRequired: "small",
+      openingMove: "Start with one honest sentence.",
+      nextAction: "Name the task and one unclear part.",
+      reasons: ["Initial state before user input."],
+    },
     llmPolicy: {
       permission: "scaffold-only",
       useCase: "summarize",
@@ -143,6 +178,10 @@ export function runAnchorEngine(
     Boolean(session.activeTask && !isClearlyNewTask(normalized, parsedTask));
   const effectiveTask =
     isCheckpointContinuation || isActiveTaskFollowUp ? session.activeTask! : parsedTask;
+  const features = extractAnchorFeatures(input, effectiveTask, session);
+  const hypothesisScores = scoreHypotheses(features, effectiveTask);
+  const hypothesis = selectBestHypothesis(hypothesisScores);
+  const responsePlan = createResponsePlan(hypothesis, features, effectiveTask);
   const detectedMode = selectedMode === "auto" ? effectiveTask.inferredMode : selectedMode;
   const cognitiveState = mapCognitiveState(normalized, detectedMode);
   const agencyRisk = detectAgencyRisk(normalized);
@@ -167,6 +206,7 @@ export function runAnchorEngine(
     policy: responsePolicy,
     loopStage,
     turnCount: session.turnCount,
+    responsePlan,
   });
 
   const result: AnchorResult = {
@@ -178,9 +218,14 @@ export function runAnchorEngine(
     reply,
     actionCard:
       inferActionCardFromReply(reply) ??
+      inferActionCardFromPlan(responsePlan) ??
       generateActionCard(detectedMode, cognitiveState, agencyRisk, loopStage),
     trace,
     parsedTask: effectiveTask,
+    features,
+    hypothesis,
+    hypothesisScores,
+    responsePlan,
     llmPolicy,
   };
 

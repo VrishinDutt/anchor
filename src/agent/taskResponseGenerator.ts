@@ -7,6 +7,8 @@ import type {
   ResponsePolicy,
 } from "./anchorEngine";
 import type { ParsedTask } from "./taskParser";
+import type { ResponsePlan } from "./responsePlanner";
+import { composePlannedReply } from "./responseComposer";
 
 type ArtifactRequest =
   | "code"
@@ -26,11 +28,27 @@ export function generateTaskSpecificReply(params: {
   policy: ResponsePolicy;
   loopStage: AnchorLoopStage;
   turnCount: number;
+  responsePlan?: ResponsePlan;
 }) {
-  const { input, task, agencyRisk, policy, turnCount } = params;
+  const { input, task, agencyRisk, policy, turnCount, responsePlan } = params;
   const decisionResult = tryRunDecisionLens(input);
   if (decisionResult) {
     return decisionResult.reply;
+  }
+
+  const composedReply = composePlannedReply({
+    input,
+    task,
+    responsePlan,
+    agencyRisk,
+  });
+  if (composedReply) {
+    return composedReply;
+  }
+
+  const plannedReply = generatePlanAwareReply(responsePlan, task, agencyRisk);
+  if (plannedReply) {
+    return plannedReply;
   }
 
   const artifactRequest = detectArtifactRequest(input);
@@ -80,6 +98,84 @@ export function generateTaskSpecificReply(params: {
       return generateGeneralReply(task);
   }
 }
+
+
+function generatePlanAwareReply(
+  responsePlan: ResponsePlan | undefined,
+  task: ParsedTask,
+  agencyRisk: AgencyRisk
+): string | null {
+  if (!responsePlan) return null;
+
+  if (responsePlan.hypothesis === "needs_agency_checkpoint" && agencyRisk !== "low") {
+    return [
+      responsePlan.openingMove,
+      "",
+      "I can help build the artifact, but Anchor should not erase your ownership of it.",
+      "",
+      "One-sentence checkpoint:",
+      "What is the core idea you want this work to prove?",
+      "",
+      "Next grounded action:",
+      responsePlan.nextAction,
+    ].join("\n");
+  }
+
+  if (responsePlan.hypothesis === "needs_clarification" && task.artifacts.length === 0) {
+    return [
+      responsePlan.openingMove,
+      "",
+      "Choose one:",
+      "1. Define the idea",
+      "2. Build the code",
+      "3. Debug a failure",
+      "4. Write the report",
+      "5. Prepare the presentation",
+      "",
+      "Next grounded action:",
+      responsePlan.nextAction,
+    ].join("\n");
+  }
+
+  if (responsePlan.hypothesis === "needs_language_refinement") {
+    return [
+      responsePlan.openingMove,
+      "",
+      "Refinement target:",
+      "Keep the user's meaning fixed, but improve clarity, precision, and presentation.",
+      "",
+      "Next grounded action:",
+      responsePlan.nextAction,
+    ].join("\n");
+  }
+
+  if (responsePlan.hypothesis === "needs_debugging_help") {
+    return [
+      responsePlan.openingMove,
+      "",
+      "Debugging order:",
+      "1. Reproduce the failure once.",
+      "2. Read the exact error line.",
+      "3. Patch the smallest failing layer.",
+      "4. Re-run the build before changing design.",
+      "",
+      "Next grounded action:",
+      responsePlan.nextAction,
+    ].join("\n");
+  }
+
+  if (responsePlan.hypothesis === "needs_grounded_action" && task.complexity === "simple") {
+    return [
+      responsePlan.openingMove,
+      "",
+      "Next grounded action:",
+      responsePlan.nextAction,
+    ].join("\n");
+  }
+
+  return null;
+}
+
 
 function detectArtifactRequest(input: string): ArtifactRequest {
   const text = input.toLowerCase().trim();
