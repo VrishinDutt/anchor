@@ -9,6 +9,9 @@ import type {
 import type { ParsedTask } from "./taskParser";
 import type { ResponsePlan } from "./responsePlanner";
 import { composePlannedReply } from "./responseComposer";
+import type { InputFrame } from "./inputFrame";
+import type { TaskFrame } from "./taskFrame";
+import type { CognitiveFrame } from "./cognitiveFrame";
 
 type ArtifactRequest =
   | "code"
@@ -29,11 +32,25 @@ export function generateTaskSpecificReply(params: {
   loopStage: AnchorLoopStage;
   turnCount: number;
   responsePlan?: ResponsePlan;
+  inputFrame?: InputFrame;
+  taskFrame?: TaskFrame;
+  cognitiveFrame?: CognitiveFrame;
 }) {
-  const { input, task, agencyRisk, policy, turnCount, responsePlan } = params;
+  const { input, task, agencyRisk, policy, turnCount, responsePlan, inputFrame, taskFrame, cognitiveFrame } = params;
   const decisionResult = tryRunDecisionLens(input);
   if (decisionResult) {
     return decisionResult.reply;
+  }
+
+  const artifactRequest = detectArtifactRequest(input);
+  if (
+    turnCount > 0 &&
+    artifactRequest !== "unknown" &&
+    agencyRisk === "low" &&
+    responsePlan &&
+    ["needs_scaffold", "healthy_progress", "needs_grounded_action"].includes(responsePlan.hypothesis)
+  ) {
+    return generateArtifactReply(artifactRequest, input, task);
   }
 
   const composedReply = composePlannedReply({
@@ -41,6 +58,9 @@ export function generateTaskSpecificReply(params: {
     task,
     responsePlan,
     agencyRisk,
+    inputFrame,
+    taskFrame,
+    cognitiveFrame,
   });
   if (composedReply) {
     return composedReply;
@@ -50,8 +70,6 @@ export function generateTaskSpecificReply(params: {
   if (plannedReply) {
     return plannedReply;
   }
-
-  const artifactRequest = detectArtifactRequest(input);
 
   if (turnCount > 0 && artifactRequest !== "unknown") {
     return generateArtifactReply(artifactRequest, input, task);

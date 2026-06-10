@@ -119,18 +119,58 @@ export function DetailDrawer({
 
       <DrawerButton
         title="Reasoning"
-        subtitle={latestResult.responsePolicy}
+        subtitle={`${latestResult.inputFrame.intentKind} · ${latestResult.responsePlan.tone ?? latestResult.responsePlan.stance}`}
         active={open === "reasoning"}
         onClick={() => toggle("reasoning")}
       />
 
       {open === "reasoning" && (
-        <div className="drawer-panel compact-facts">
-          <Fact label="Domain" value={latestResult.parsedTask.domain} />
-          <Fact label="Complexity" value={latestResult.parsedTask.complexity} />
-          <Fact label="State" value={latestResult.cognitiveState} />
-          <Fact label="Agency" value={latestResult.agencyRisk} />
-          <Fact label="Loop" value={latestResult.loopStage} />
+        <div className="drawer-panel reasoning-panel">
+          <div className="reasoning-hero">
+            <span>Top hypothesis</span>
+            <strong>{humanHypothesis(latestResult.hypothesis.hypothesis)}</strong>
+            <small>
+              {Math.round(latestResult.hypothesis.score * 100)}% confidence · {latestResult.responsePlan.stance}
+              {latestResult.responsePlan.tone ? ` · ${latestResult.responsePlan.tone}` : ""}
+            </small>
+          </div>
+
+          <div className="compact-facts">
+            <Fact label="Intent" value={latestResult.inputFrame.intentKind} />
+            {latestResult.inputFrame.failureTarget && (
+              <Fact label="Failure" value={latestResult.inputFrame.failureTarget} />
+            )}
+            <Fact label="Domain" value={latestResult.parsedTask.domain} />
+            <Fact label="Work" value={latestResult.taskFrame.workType} />
+            <Fact label="Load" value={latestResult.cognitiveFrame.load} />
+            <Fact label="Posture" value={latestResult.cognitiveFrame.agencyPosture} />
+            <Fact label="Need" value={latestResult.cognitiveFrame.interventionNeed} />
+            <Fact label="Depth" value={latestResult.responsePlan.allowedDepth} />
+          </div>
+
+          <div className="feature-grid">
+            <FeatureScore label="Intent" value={latestResult.features.intentClarity} />
+            <FeatureScore label="Artifact pressure" value={latestResult.features.artifactPressure} />
+            <FeatureScore label="Agency risk" value={latestResult.features.agencyRisk} />
+            <FeatureScore label="Ownership" value={latestResult.features.ownershipSignal} />
+            <FeatureScore label="Actionability" value={latestResult.features.actionability} />
+            <FeatureScore label="Uncertainty" value={latestResult.features.uncertainty} />
+            <FeatureScore label="Frame confidence" value={latestResult.cognitiveFrame.confidence} />
+          </div>
+
+          <div className="reason-block">
+            <span>Top evidence</span>
+            <ul>
+              {[...latestResult.hypothesis.evidence, ...latestResult.hypothesis.reasons].slice(0, 4).map((reason, index) => (
+                <li key={index}>{reason}</li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="reason-block">
+            <span>{latestResult.responsePlan.nextPrompt ? "Planned prompt" : "Planned next action"}</span>
+            <p>{latestResult.responsePlan.nextPrompt ?? latestResult.responsePlan.nextAction}</p>
+          </div>
         </div>
       )}
 
@@ -173,6 +213,31 @@ export function DetailDrawer({
     </section>
   );
 }
+
+
+function humanHypothesis(hypothesis: string) {
+  return hypothesis
+    .replace("needs_", "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function FeatureScore({ label, value }: { label: string; value: number }) {
+  const pct = Math.round(value * 100);
+
+  return (
+    <div className="feature-score">
+      <div>
+        <span>{label}</span>
+        <strong>{pct}%</strong>
+      </div>
+      <div className="feature-track">
+        <div className="feature-fill" style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
 
 function DrawerButton({
   title,

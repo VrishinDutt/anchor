@@ -5,7 +5,9 @@ import { decideLlmUse } from "./llm/llmPolicy";
 import { extractAnchorFeatures, type AnchorFeatures } from "./featureEngineering";
 import { scoreHypotheses, selectBestHypothesis, type HypothesisScore } from "./reasoningModel";
 import { createResponsePlan, type ResponsePlan } from "./responsePlanner";
-import { buildInputFrame } from "./inputFrame";
+import { buildInputFrame, type InputFrame } from "./inputFrame";
+import { buildTaskFrame, type TaskFrame } from "./taskFrame";
+import { buildCognitiveFrame, type CognitiveFrame } from "./cognitiveFrame";
 import type { LlmPolicyDecision } from "./llm/llmTypes";
 export type Mode =
   | "auto"
@@ -81,6 +83,9 @@ export type AnchorResult = {
   actionCard: ActionCard;
   trace: AgentTrace;
   parsedTask: ParsedTask;
+  inputFrame: InputFrame;
+  taskFrame: TaskFrame;
+  cognitiveFrame: CognitiveFrame;
   features: AnchorFeatures;
   hypothesis: HypothesisScore;
   hypothesisScores: HypothesisScore[];
@@ -101,6 +106,8 @@ export function createInitialSession(): AnchorSession {
 }
 
 export function createInitialResult(): AnchorResult {
+  const inputFrame = buildInputFrame("");
+
   return {
     detectedMode: "auto",
     cognitiveState: "steady",
@@ -130,6 +137,24 @@ export function createInitialResult(): AnchorResult {
       userGoal: "Clarify the problem and identify the next grounded action.",
       inferredMode: "auto",
     },
+    inputFrame,
+    taskFrame: {
+      primaryGoal: "Clarify the problem and identify the next grounded action.",
+      workType: "learn",
+      artifactFocus: [],
+      constraints: [],
+      missingInfo: [],
+      isContinuation: false,
+      isRecoverableFailure: false,
+      shouldPreserveUserOwnership: false,
+    },
+    cognitiveFrame: {
+      load: "low",
+      agencyPosture: "neutral",
+      interventionNeed: "none",
+      confidence: 0,
+      notes: ["Initial state before user input."],
+    },
     features: {
       intentClarity: 0,
       artifactPressure: 0,
@@ -146,6 +171,7 @@ export function createInitialResult(): AnchorResult {
       hypothesis: "healthy_progress",
       score: 0,
       reasons: ["Initial state before user input."],
+      evidence: ["initial state"],
     },
     hypothesisScores: [],
     responsePlan: {
@@ -157,6 +183,9 @@ export function createInitialResult(): AnchorResult {
       openingMove: "Start with one honest sentence.",
       nextAction: "Name the task and one unclear part.",
       reasons: ["Initial state before user input."],
+      tone: "calm",
+      explanationLevel: "brief",
+      needsUserInput: false,
     },
     llmPolicy: {
       permission: "scaffold-only",
@@ -173,7 +202,7 @@ export function runAnchorEngine(
 ): { result: AnchorResult; session: AnchorSession } {
   const normalized = normalize(input);
   const parsedTask = parseTask(input, selectedMode);
-  const frame = buildInputFrame(input, Boolean(session.activeTask));
+  const inputFrame = buildInputFrame(input, Boolean(session.activeTask));
   const isCheckpointContinuation =
     Boolean(session.awaitingCheckpoint && session.activeTask && normalized.length > 0);
   const isActiveTaskFollowUp =
@@ -181,9 +210,11 @@ export function runAnchorEngine(
   const effectiveTask =
     isCheckpointContinuation || isActiveTaskFollowUp ? session.activeTask! : parsedTask;
   const features = extractAnchorFeatures(input, effectiveTask, session);
-  const hypothesisScores = scoreHypotheses(features, effectiveTask, frame);
+  const taskFrame = buildTaskFrame(inputFrame, effectiveTask, session);
+  const cognitiveFrame = buildCognitiveFrame(features, inputFrame, taskFrame);
+  const hypothesisScores = scoreHypotheses(features, effectiveTask, inputFrame, taskFrame, cognitiveFrame);
   const hypothesis = selectBestHypothesis(hypothesisScores);
-  const responsePlan = createResponsePlan(hypothesis, features, effectiveTask);
+  const responsePlan = createResponsePlan(hypothesis, features, effectiveTask, inputFrame, taskFrame, cognitiveFrame);
   const detectedMode = selectedMode === "auto" ? effectiveTask.inferredMode : selectedMode;
   const cognitiveState = mapCognitiveState(normalized, detectedMode);
   const agencyRisk = detectAgencyRisk(normalized);
@@ -209,6 +240,9 @@ export function runAnchorEngine(
     loopStage,
     turnCount: session.turnCount,
     responsePlan,
+    inputFrame,
+    taskFrame,
+    cognitiveFrame,
   });
 
   const result: AnchorResult = {
@@ -224,6 +258,9 @@ export function runAnchorEngine(
       generateActionCard(detectedMode, cognitiveState, agencyRisk, loopStage),
     trace,
     parsedTask: effectiveTask,
+    inputFrame,
+    taskFrame,
+    cognitiveFrame,
     features,
     hypothesis,
     hypothesisScores,
@@ -290,10 +327,13 @@ function detectAgencyRisk(text: string): AgencyRisk {
   if (
     includesAny(text, [
       "just write",
+      "just make",
       "do it for me",
       "i'll understand later",
       "understand later",
       "copy paste",
+      "make the full",
+      "submit it",
       "make it sound like",
       "vibe code",
       "vibecode",
