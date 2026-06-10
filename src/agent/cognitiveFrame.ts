@@ -137,7 +137,11 @@ function inferNotes(
   }
 
   if (taskFrame.isContinuation) {
-    notes.push("Session context suggests this is a continuation.");
+    notes.push(
+      inputFrame.continuationKind === "none"
+        ? "Session context suggests this is a continuation."
+        : `Continuation signal: ${inputFrame.continuationKind}.`
+    );
   }
 
   if (notes.length === 0) {

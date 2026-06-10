@@ -4,6 +4,9 @@ import type { ParsedTask } from "./taskParser";
 type SessionLike = {
   activeTask?: ParsedTask;
   awaitingCheckpoint?: boolean;
+  lastFailureTarget?: InputFrame["failureTarget"];
+  lastIntentKind?: InputFrame["intentKind"];
+  lastWorkType?: TaskFrame["workType"];
 };
 
 export type TaskFrame = {
@@ -33,11 +36,17 @@ export function buildTaskFrame(
   parsedTask: ParsedTask,
   session?: SessionLike
 ): TaskFrame {
+  const hasContinuationMemory = Boolean(
+    session?.activeTask ||
+      session?.lastFailureTarget ||
+      session?.lastIntentKind ||
+      session?.lastWorkType
+  );
   const isContinuation =
-    Boolean(session?.activeTask) &&
-    (inputFrame.isContinuation ||
-      inputFrame.intentKind === "status_update" ||
-      hasAny(inputFrame.normalized, ["proceed", "continue", "next"]));
+    inputFrame.isContinuation ||
+    (hasContinuationMemory &&
+      (inputFrame.intentKind === "status_update" ||
+        hasAny(inputFrame.normalized, ["proceed", "continue", "next"])));
 
   const artifactFocus = inferArtifactFocus(inputFrame, parsedTask);
   const workType = inferWorkType(inputFrame, parsedTask, isContinuation);
@@ -53,7 +62,7 @@ export function buildTaskFrame(
       (inputFrame.requestedDepth === "full" || parsedTask.artifacts.length >= 1)) ||
     parsedTask.inferredMode === "agency-check";
   const constraints = inferConstraints(inputFrame, parsedTask, shouldPreserveUserOwnership);
-  const missingInfo = inferMissingInfo(inputFrame, parsedTask, session, workType);
+  const missingInfo = inferMissingInfo(inputFrame, parsedTask, session, workType, hasContinuationMemory);
 
   return {
     primaryGoal: inferPrimaryGoal(inputFrame, parsedTask, workType, artifactFocus, isContinuation),
@@ -83,6 +92,7 @@ function inferWorkType(
   parsedTask: ParsedTask,
   isContinuation: boolean
 ): TaskFrame["workType"] {
+  if (inputFrame.continuationKind === "recover") return "recover";
   if (inputFrame.intentKind === "casual_failure") return "recover";
   if (inputFrame.intentKind === "debugging" || inputFrame.failureTarget) return "debug";
   if (isContinuation) return "continue";
@@ -129,7 +139,8 @@ function inferMissingInfo(
   inputFrame: InputFrame,
   parsedTask: ParsedTask,
   session: SessionLike | undefined,
-  workType: TaskFrame["workType"]
+  workType: TaskFrame["workType"],
+  hasContinuationMemory: boolean
 ) {
   const missing = new Set<string>();
   const text = inputFrame.normalized;
@@ -148,7 +159,7 @@ function inferMissingInfo(
     }
   }
 
-  if ((workType === "continue" || inputFrame.isContinuation) && !session?.activeTask) {
+  if ((workType === "continue" || inputFrame.isContinuation) && !session?.activeTask && !hasContinuationMemory) {
     missing.add("task boundary");
   }
 

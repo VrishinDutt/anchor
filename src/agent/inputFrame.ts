@@ -1,28 +1,32 @@
+export type InputIntentKind =
+  | "debugging"
+  | "artifact_creation"
+  | "language_refinement"
+  | "decision"
+  | "learning"
+  | "project_planning"
+  | "status_update"
+  | "casual_failure"
+  | "unknown";
+
+export type InputFailureTarget =
+  | "claude"
+  | "tauri"
+  | "frontend"
+  | "agent_logic"
+  | "build"
+  | "git"
+  | "environment"
+  | "unknown"
+  | null;
+
 export type InputFrame = {
   raw: string;
   normalized: string;
   tokens: string[];
   isShort: boolean;
-  intentKind:
-    | "debugging"
-    | "artifact_creation"
-    | "language_refinement"
-    | "decision"
-    | "learning"
-    | "project_planning"
-    | "status_update"
-    | "casual_failure"
-    | "unknown";
-  failureTarget:
-    | "claude"
-    | "tauri"
-    | "frontend"
-    | "agent_logic"
-    | "build"
-    | "git"
-    | "environment"
-    | "unknown"
-    | null;
+  intentKind: InputIntentKind;
+  failureTarget: InputFailureTarget;
   urgencyLevel: "low" | "medium" | "high";
   register: "casual" | "academic" | "technical" | "frustrated" | "neutral";
   requestedDepth: "micro" | "medium" | "full";
@@ -35,7 +39,16 @@ export type InputFrame = {
   isArtifactRequest: boolean;
   isOutsourcingRequest: boolean;
   isContinuation: boolean;
+  continuationKind: "none" | "advance" | "complete" | "confirm" | "confused" | "recover";
+  previousIntentKind?: InputIntentKind;
   emotionalTone: "neutral" | "frustrated" | "confused" | "urgent" | "casual";
+};
+
+export type InputFrameContext = {
+  hasActiveTask?: boolean;
+  lastFailureTarget?: InputFailureTarget;
+  lastIntentKind?: InputIntentKind;
+  lastWorkType?: string;
 };
 
 const normalize = (input: string) =>
@@ -50,7 +63,15 @@ const hasAny = (text: string, terms: string[]) => terms.some((term) => text.incl
 
 const isExactlyAny = (text: string, terms: string[]) => terms.includes(text);
 
-export function buildInputFrame(input: string, hasActiveTask = false): InputFrame {
+export function buildInputFrame(input: string, context: boolean | InputFrameContext = false): InputFrame {
+  const frameContext = typeof context === "boolean" ? { hasActiveTask: context } : context;
+  const hasActiveTask = Boolean(frameContext.hasActiveTask);
+  const hasContinuationMemory = Boolean(
+    hasActiveTask ||
+      frameContext.lastFailureTarget ||
+      frameContext.lastIntentKind ||
+      frameContext.lastWorkType
+  );
   const normalized = normalize(input);
   const tokens = normalized.split(/\s+/).filter(Boolean);
   const isShort = tokens.length <= 7;
@@ -164,24 +185,11 @@ export function buildInputFrame(input: string, hasActiveTask = false): InputFram
     "do everything",
   ]);
 
-  const continuationTerms = [
-    "next",
-    "what now",
-    "proceed",
-    "continue",
-    "done",
-    "works",
-    "it works",
-    "cool",
-    "huh",
-    "what",
-    "oops",
-  ];
+  const continuationKind = detectContinuationKind(normalized);
   const isContinuation =
-    hasActiveTask &&
-    (isShort ||
-      isExactlyAny(normalized, continuationTerms) ||
-      hasAny(normalized, ["the app works", "app works", "what now", "next step"]));
+    continuationKind !== "none" ||
+    (hasContinuationMemory &&
+      (isShort || hasAny(normalized, ["the app works", "app works", "what now", "next step"])));
 
   const failureTarget = detectFailureTarget(normalized, isDebugging, isLlmProviderIssue);
   const intentKind = detectIntentKind({
@@ -238,8 +246,37 @@ export function buildInputFrame(input: string, hasActiveTask = false): InputFram
     isArtifactRequest,
     isOutsourcingRequest,
     isContinuation,
+    continuationKind,
+    previousIntentKind: frameContext.lastIntentKind,
     emotionalTone,
   };
+}
+
+function detectContinuationKind(text: string): InputFrame["continuationKind"] {
+  if (isExactlyAny(text, ["next", "proceed", "continue", "what now", "next step"])) {
+    return "advance";
+  }
+
+  if (isExactlyAny(text, ["done", "finished", "completed"]) || hasAny(text, ["i finished", "i completed"])) {
+    return "complete";
+  }
+
+  if (
+    isExactlyAny(text, ["works", "it works", "app works", "cool"]) ||
+    hasAny(text, ["the app works", "provider works", "claude works"])
+  ) {
+    return "confirm";
+  }
+
+  if (isExactlyAny(text, ["huh", "what"]) || hasAny(text, ["i'm confused", "im confused", "confused"])) {
+    return "confused";
+  }
+
+  if (isExactlyAny(text, ["oops"]) || hasAny(text, ["oops", "broke again", "it broke"])) {
+    return "recover";
+  }
+
+  return "none";
 }
 
 function detectFailureTarget(

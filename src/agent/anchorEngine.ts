@@ -71,6 +71,13 @@ export type AnchorSession = {
   activeTask?: ParsedTask;
   awaitingCheckpoint?: boolean;
   lastUserCheckpoint?: string;
+  lastHypothesis?: HypothesisScore["hypothesis"];
+  lastResponsePlan?: ResponsePlan;
+  lastActionCardTitle?: string;
+  lastFailureTarget?: InputFrame["failureTarget"];
+  lastNextPrompt?: string;
+  lastWorkType?: TaskFrame["workType"];
+  lastIntentKind?: InputFrame["intentKind"];
 };
 
 export type AnchorResult = {
@@ -102,6 +109,13 @@ export function createInitialSession(): AnchorSession {
     activeTask: undefined,
     awaitingCheckpoint: false,
     lastUserCheckpoint: undefined,
+    lastHypothesis: undefined,
+    lastResponsePlan: undefined,
+    lastActionCardTitle: undefined,
+    lastFailureTarget: undefined,
+    lastNextPrompt: undefined,
+    lastWorkType: undefined,
+    lastIntentKind: undefined,
   };
 }
 
@@ -202,7 +216,12 @@ export function runAnchorEngine(
 ): { result: AnchorResult; session: AnchorSession } {
   const normalized = normalize(input);
   const parsedTask = parseTask(input, selectedMode);
-  const inputFrame = buildInputFrame(input, Boolean(session.activeTask));
+  const inputFrame = buildInputFrame(input, {
+    hasActiveTask: Boolean(session.activeTask),
+    lastFailureTarget: session.lastFailureTarget,
+    lastIntentKind: session.lastIntentKind,
+    lastWorkType: session.lastWorkType,
+  });
   const isCheckpointContinuation =
     Boolean(session.awaitingCheckpoint && session.activeTask && normalized.length > 0);
   const isActiveTaskFollowUp =
@@ -243,7 +262,13 @@ export function runAnchorEngine(
     inputFrame,
     taskFrame,
     cognitiveFrame,
+    session,
   });
+
+  const actionCard =
+    inferActionCardFromReply(reply) ??
+    inferActionCardFromPlan(responsePlan) ??
+    generateActionCard(detectedMode, cognitiveState, agencyRisk, loopStage);
 
   const result: AnchorResult = {
     detectedMode,
@@ -252,10 +277,7 @@ export function runAnchorEngine(
     responsePolicy: normalizePolicyLabel(responsePolicy, reply),
     loopStage,
     reply,
-    actionCard:
-      inferActionCardFromReply(reply) ??
-      inferActionCardFromPlan(responsePlan) ??
-      generateActionCard(detectedMode, cognitiveState, agencyRisk, loopStage),
+    actionCard,
     trace,
     parsedTask: effectiveTask,
     inputFrame,
@@ -278,6 +300,13 @@ export function runAnchorEngine(
       activeTask: chooseActiveTask(session.activeTask, effectiveTask),
       awaitingCheckpoint: shouldAwaitCheckpoint(agencyRisk, responsePolicy, effectiveTask, isCheckpointContinuation),
       lastUserCheckpoint: isCheckpointContinuation ? input : session.lastUserCheckpoint,
+      lastHypothesis: hypothesis.hypothesis,
+      lastResponsePlan: responsePlan,
+      lastActionCardTitle: actionCard.title,
+      lastFailureTarget: inputFrame.failureTarget ?? session.lastFailureTarget,
+      lastNextPrompt: responsePlan.nextPrompt ?? responsePlan.nextAction,
+      lastWorkType: taskFrame.workType,
+      lastIntentKind: inputFrame.intentKind,
     },
   };
 }

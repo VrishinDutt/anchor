@@ -101,6 +101,9 @@ export function scoreHypotheses(
     Boolean(taskFrame?.isContinuation) ||
     Boolean(frame?.isContinuation) ||
     features.continuationSignal >= 0.75;
+  const hasContinuationMemory = Boolean(
+    taskFrame?.isContinuation && !taskFrame.missingInfo.includes("task boundary")
+  );
   const vagueContinuation = Boolean(
     frame?.isShort &&
       includesAny(inputText, ["next", "proceed", "continue", "done", "works", "cool"])
@@ -141,9 +144,9 @@ export function scoreHypotheses(
         features.uncertainty * 0.45 +
           (1 - features.intentClarity) * 0.28 +
           (shortConfusion ? 0.26 : 0) +
-          (noActiveTaskBoundary ? 0.35 : 0) -
+          (noActiveTaskBoundary ? 0.48 : 0) -
           (hasDebugSignal ? 0.35 : 0) -
-          (hasActiveContinuation ? 0.18 : 0)
+          (hasContinuationMemory ? 0.18 : 0)
       ),
       reasons: [
         noActiveTaskBoundary
@@ -204,10 +207,11 @@ export function scoreHypotheses(
     {
       hypothesis: "needs_grounded_action",
       score: clamp01(
-        features.actionability * 0.42 +
+          features.actionability * 0.42 +
           features.intentClarity * 0.22 +
-          (hasActiveContinuation && vagueContinuation ? 0.55 : 0) +
-          (hasActiveContinuation && frame?.intentKind === "status_update" ? 0.38 : 0) -
+          (hasContinuationMemory && vagueContinuation ? 0.55 : 0) +
+          (hasContinuationMemory && frame?.intentKind === "status_update" ? 0.38 : 0) -
+          (noActiveTaskBoundary ? 0.42 : 0) -
           (hasDebugSignal ? 0.3 : 0) -
           (hasOutsourcingSignal ? 0.22 : 0)
       ),

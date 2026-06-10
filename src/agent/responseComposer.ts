@@ -1,4 +1,4 @@
-import type { AgencyRisk } from "./anchorEngine";
+import type { AgencyRisk, AnchorSession } from "./anchorEngine";
 import type { ParsedTask } from "./taskParser";
 import type { ResponsePlan } from "./responsePlanner";
 import type { InputFrame } from "./inputFrame";
@@ -39,13 +39,23 @@ export function composePlannedReply(params: {
   inputFrame?: InputFrame;
   taskFrame?: TaskFrame;
   cognitiveFrame?: CognitiveFrame;
+  session?: AnchorSession;
 }): string | null {
-  const { input, task, responsePlan, agencyRisk, inputFrame, taskFrame } = params;
+  const { input, task, responsePlan, agencyRisk, inputFrame, taskFrame, session } = params;
   if (!responsePlan) return null;
 
   const artifact = artifactLabel(task);
   const constraint = constraintLine(task);
   const nextAction = softNextAction(responsePlan.nextAction);
+  const continuationReply = composeContinuationReply({
+    inputFrame,
+    taskFrame,
+    responsePlan,
+    session,
+    nextAction,
+  });
+
+  if (continuationReply) return continuationReply;
 
   switch (responsePlan.hypothesis) {
     case "needs_agency_checkpoint": {
@@ -247,6 +257,75 @@ export function composePlannedReply(params: {
     default:
       return null;
   }
+}
+
+function composeContinuationReply(params: {
+  inputFrame?: InputFrame;
+  taskFrame?: TaskFrame;
+  responsePlan: ResponsePlan;
+  session?: AnchorSession;
+  nextAction: string;
+}) {
+  const { inputFrame, taskFrame, responsePlan, session, nextAction } = params;
+  const kind = inputFrame?.continuationKind ?? "none";
+
+  if (kind === "none") return null;
+
+  if (kind === "recover") {
+    return "Something broke or changed. Send the exact failure, or tell me what action happened just before this.";
+  }
+
+  if (isTaskBoundaryMissing(inputFrame, taskFrame)) {
+    return "I need a task boundary first: build, debug, report, present, or decide?";
+  }
+
+  if (
+    kind === "confirm" &&
+    session?.lastFailureTarget === "claude" &&
+    (session.lastWorkType === "debug" || session.lastWorkType === "recover")
+  ) {
+    return "Good. That means the provider path is alive. Test one real Claude assist prompt before changing code.";
+  }
+
+  if (kind === "confirm" && (session?.lastWorkType === "debug" || session?.lastWorkType === "recover")) {
+    return "Good. That means the failing path recovered. Re-run the same check once before expanding scope.";
+  }
+
+  if (kind === "advance") {
+    return [
+      "Continuing the current thread.",
+      `The next useful step is: ${nextAction}`,
+    ].join("\n");
+  }
+
+  if (kind === "complete") {
+    return [
+      "Good. Lock that checkpoint.",
+      `Now the next bounded move is: ${nextAction}`,
+    ].join("\n");
+  }
+
+  if (kind === "confirm") {
+    return [
+      "Good. Lock that checkpoint.",
+      `Now the next bounded move is: ${nextAction}`,
+    ].join("\n");
+  }
+
+  if (kind === "confused") {
+    const simplerStep =
+      session?.lastNextPrompt ||
+      session?.lastResponsePlan?.nextAction ||
+      responsePlan.nextPrompt ||
+      responsePlan.nextAction;
+
+    return [
+      `Simplifying: ${softNextAction(simplerStep)}`,
+      "Do only that, then come back with what changed.",
+    ].join("\n");
+  }
+
+  return null;
 }
 
 function describeArtifacts(task: ParsedTask) {

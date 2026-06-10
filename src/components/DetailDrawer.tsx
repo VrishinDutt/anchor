@@ -189,6 +189,12 @@ export function DetailDrawer({
 
           <div className="compact-facts">
             <Fact label="Intent" value={latestResult.inputFrame.intentKind} />
+            {latestResult.inputFrame.isContinuation && (
+              <Fact label="Continuation" value={latestResult.inputFrame.continuationKind} />
+            )}
+            {latestResult.inputFrame.isContinuation && latestResult.inputFrame.previousIntentKind && (
+              <Fact label="Previous" value={latestResult.inputFrame.previousIntentKind} />
+            )}
             {latestResult.inputFrame.failureTarget && (
               <Fact label="Failure" value={latestResult.inputFrame.failureTarget} />
             )}
