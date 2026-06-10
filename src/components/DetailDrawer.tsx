@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { generateSessionSummary } from "../agent/sessionSummary";
 import { exportTextFile } from "../agent/exportSession";
-import { runLlmDraft } from "../agent/llm/llmClient";
+import { getProviderStatus, runLlmDraft } from "../agent/llm/llmClient";
 import type { AnchorResult, AnchorSession, ChatMessage } from "../agent/anchorEngine";
+import type { ProviderStatus } from "../agent/llm/llmTypes";
 
 type DetailDrawerProps = {
   latestResult: AnchorResult;
@@ -21,13 +22,38 @@ export function DetailDrawer({
   const [open, setOpen] = useState<DrawerKey>("claude");
   const [llmDraft, setLlmDraft] = useState("");
   const [llmStatus, setLlmStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [providerStatus, setProviderStatus] = useState<ProviderStatus | null>(null);
+  const [providerCheckStatus, setProviderCheckStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [providerCheckError, setProviderCheckError] = useState("");
   const [exportStatus, setExportStatus] = useState("");
 
   const summary = generateSessionSummary(messages, latestResult);
   const policy = latestResult.llmPolicy;
+  const providerMessage =
+    providerCheckStatus === "error"
+      ? providerCheckError
+      : providerStatus?.message ?? "Run a local provider check before debugging API failures.";
 
   function toggle(key: DrawerKey) {
     setOpen((current) => (current === key ? null : key));
+  }
+
+  async function checkProviderStatus() {
+    setProviderCheckStatus("loading");
+    setProviderCheckError("");
+
+    try {
+      const status = await getProviderStatus();
+      setProviderStatus(status);
+      setProviderCheckStatus("ready");
+      return status;
+    } catch (error) {
+      const message = formatUnknownError(error);
+      setProviderStatus(null);
+      setProviderCheckError(message);
+      setProviderCheckStatus("error");
+      return null;
+    }
   }
 
   async function deepenWithClaude() {
@@ -47,16 +73,16 @@ export function DetailDrawer({
       setLlmStatus("ready");
       setOpen("claude");
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : typeof error === "string"
-            ? error
-            : JSON.stringify(error, null, 2);
+      const message = formatUnknownError(error);
+      const providerHint = providerStatus
+        ? `Local provider check: ${providerStatus.message}`
+        : "Local provider check: use Check provider below to inspect the native environment.";
 
       setLlmDraft(
         [
           "Claude could not be reached.",
+          "",
+          providerHint,
           "",
           "Detail:",
           message,
@@ -65,6 +91,7 @@ export function DetailDrawer({
 
       setLlmStatus("error");
       setOpen("claude");
+      void checkProviderStatus();
     }
   }
 
@@ -108,6 +135,31 @@ export function DetailDrawer({
               {llmStatus === "loading" ? "Holding boundary..." : "Deepen with Claude"}
             </button>
           )}
+
+          <div className="provider-status-section">
+            <div className="provider-status-header">
+              <span>Provider status</span>
+              <button onClick={checkProviderStatus} disabled={providerCheckStatus === "loading"}>
+                {providerCheckStatus === "loading" ? "Checking..." : "Check provider"}
+              </button>
+            </div>
+
+            <div className="compact-facts">
+              <Fact label="Provider" value={providerStatus?.provider ?? "not checked"} />
+              <Fact
+                label="Claude key"
+                value={providerStatus ? keyPresenceLabel(providerStatus.anthropicKeyPresent) : "not checked"}
+              />
+              <Fact
+                label="Runtime"
+                value={providerCheckStatus === "error" || providerStatus?.tauriRuntime === false ? "unavailable" : "native Tauri"}
+              />
+            </div>
+
+            <p className={providerCheckStatus === "error" ? "provider-status-message error" : "provider-status-message"}>
+              {providerMessage}
+            </p>
+          </div>
 
           {llmDraft && (
             <div className={`llm-output ${llmStatus === "error" ? "error" : ""}`}>
@@ -214,6 +266,16 @@ export function DetailDrawer({
   );
 }
 
+
+function formatUnknownError(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return JSON.stringify(error, null, 2);
+}
+
+function keyPresenceLabel(isPresent: boolean) {
+  return isPresent ? "present" : "missing";
+}
 
 function humanHypothesis(hypothesis: string) {
   return hypothesis

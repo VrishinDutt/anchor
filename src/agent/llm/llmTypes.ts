@@ -47,3 +47,12 @@ export type LlmDraftResult = {
   text: string;
   policy: LlmPolicyDecision;
 };
+
+export type ProviderStatus = {
+  provider: string;
+  anthropicKeyPresent: boolean;
+  openaiKeyPresent: boolean;
+  geminiKeyPresent: boolean;
+  tauriRuntime: boolean;
+  message: string;
+};

@@ -9,6 +9,41 @@ struct OpenAiRequest<'a> {
     max_output_tokens: u32,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ProviderStatus {
+    provider: String,
+    anthropic_key_present: bool,
+    openai_key_present: bool,
+    gemini_key_present: bool,
+    tauri_runtime: bool,
+    message: String,
+}
+
+#[tauri::command]
+fn get_provider_status() -> ProviderStatus {
+    let provider = env_config_value("ANCHOR_LLM_PROVIDER").unwrap_or_else(|| "not set".to_string());
+    let normalized_provider = provider.to_lowercase();
+    let anthropic_key_present = env_config_value("ANTHROPIC_API_KEY").is_some();
+    let openai_key_present = env_config_value("OPENAI_API_KEY").is_some();
+    let gemini_key_present = env_config_value("GEMINI_API_KEY").is_some();
+
+    ProviderStatus {
+        message: provider_status_message(
+            &provider,
+            &normalized_provider,
+            anthropic_key_present,
+            openai_key_present,
+            gemini_key_present,
+        ),
+        provider,
+        anthropic_key_present,
+        openai_key_present,
+        gemini_key_present,
+        tauri_runtime: true,
+    }
+}
+
 #[tauri::command]
 async fn run_anchor_llm(
     system_instruction: String,
@@ -72,11 +107,13 @@ async fn run_claude(system_instruction: String, user_prompt: String) -> Result<S
         ));
     }
 
-    let parsed: Value = serde_json::from_str(&raw_body)
-        .map_err(|error| format!("Could not parse Claude response JSON: {error}. Raw body: {raw_body}"))?;
+    let parsed: Value = serde_json::from_str(&raw_body).map_err(|error| {
+        format!("Could not parse Claude response JSON: {error}. Raw body: {raw_body}")
+    })?;
 
-    extract_claude_text(&parsed)
-        .ok_or_else(|| format!("Claude response succeeded but no text could be extracted. Raw body: {raw_body}"))
+    extract_claude_text(&parsed).ok_or_else(|| {
+        format!("Claude response succeeded but no text could be extracted. Raw body: {raw_body}")
+    })
 }
 
 async fn run_openai(system_instruction: String, user_prompt: String) -> Result<String, String> {
@@ -112,8 +149,9 @@ async fn run_openai(system_instruction: String, user_prompt: String) -> Result<S
         ));
     }
 
-    let parsed: Value = serde_json::from_str(&raw_body)
-        .map_err(|error| format!("Could not parse OpenAI response JSON: {error}. Raw body: {raw_body}"))?;
+    let parsed: Value = serde_json::from_str(&raw_body).map_err(|error| {
+        format!("Could not parse OpenAI response JSON: {error}. Raw body: {raw_body}")
+    })?;
 
     if let Some(output_text) = parsed.get("output_text").and_then(Value::as_str) {
         if !output_text.trim().is_empty() {
@@ -131,6 +169,53 @@ async fn run_openai(system_instruction: String, user_prompt: String) -> Result<S
     Err(format!(
         "OpenAI response succeeded but no text could be extracted. Raw body: {raw_body}"
     ))
+}
+
+fn env_config_value(name: &str) -> Option<String> {
+    std::env::var(name)
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+fn provider_status_message(
+    provider: &str,
+    normalized_provider: &str,
+    anthropic_key_present: bool,
+    openai_key_present: bool,
+    gemini_key_present: bool,
+) -> String {
+    match normalized_provider {
+        "not set" => {
+            if anthropic_key_present {
+                "Provider is not set; Claude default has a local key.".to_string()
+            } else {
+                "Provider is not set; ANTHROPIC_API_KEY is missing.".to_string()
+            }
+        }
+        "claude" | "anthropic" => {
+            if anthropic_key_present {
+                "Claude provider has a local key.".to_string()
+            } else {
+                "Claude provider is selected but ANTHROPIC_API_KEY is missing.".to_string()
+            }
+        }
+        "openai" => {
+            if openai_key_present {
+                "OpenAI provider has a local key.".to_string()
+            } else {
+                "OpenAI provider is selected but OPENAI_API_KEY is missing.".to_string()
+            }
+        }
+        "gemini" | "google" => {
+            if gemini_key_present {
+                "Gemini key is present, but Gemini is not wired in this build.".to_string()
+            } else {
+                "Gemini provider is selected but GEMINI_API_KEY is missing.".to_string()
+            }
+        }
+        _ => format!("Provider '{provider}' is not supported by this build."),
+    }
 }
 
 fn extract_claude_text(parsed: &Value) -> Option<String> {
@@ -188,7 +273,10 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .invoke_handler(tauri::generate_handler![run_anchor_llm])
+        .invoke_handler(tauri::generate_handler![
+            get_provider_status,
+            run_anchor_llm
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
