@@ -32,3 +32,7 @@ pnpm-debug.log*
 tmp/
 temp/
 .env.local
+
+# AI-OS generated review artifacts
+TASKS/reviews/local-review.md
+TASKS/reviews/xcode-build-log.txt
