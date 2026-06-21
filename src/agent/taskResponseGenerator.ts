@@ -2,6 +2,7 @@ import { tryRunDecisionLens } from "./decisionLens";
 import type {
   AgencyRisk,
   AnchorLoopStage,
+  AnchorSession,
   CognitiveState,
   Mode,
   ResponsePolicy,
@@ -35,8 +36,9 @@ export function generateTaskSpecificReply(params: {
   inputFrame?: InputFrame;
   taskFrame?: TaskFrame;
   cognitiveFrame?: CognitiveFrame;
+  session?: AnchorSession;
 }) {
-  const { input, task, agencyRisk, policy, turnCount, responsePlan, inputFrame, taskFrame, cognitiveFrame } = params;
+  const { input, task, agencyRisk, policy, turnCount, responsePlan, inputFrame, taskFrame, cognitiveFrame, session } = params;
   const decisionResult = tryRunDecisionLens(input);
   if (decisionResult) {
     return decisionResult.reply;
@@ -61,6 +63,7 @@ export function generateTaskSpecificReply(params: {
     inputFrame,
     taskFrame,
     cognitiveFrame,
+    session,
   });
   if (composedReply) {
     return composedReply;
