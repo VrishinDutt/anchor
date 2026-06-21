@@ -49,3 +49,33 @@ git diff -- requirements.txt
 - No unrelated files modified.
 - No local environment folders tracked.
 - Diff is cleanly inspectable.
+# Current Task: Establish Anchor AI-OS Baseline
+
+## Goal
+Convert the generic AI-OS governance scaffold into an Anchor-specific development control layer.
+
+## Context
+Anchor is a TypeScript/Vite project on the `llm-review-mode` branch. The current active direction involves agent/session-aware response generation and LLM review workflows.
+
+## Allowed Changes
+- PRODUCT_PRINCIPLES.md
+- ARCHITECTURE.md
+- TESTING.md
+- TASKS/current-task.md
+- TASKS/backlog.md
+- DECISIONS/ entries if needed
+
+## Forbidden Changes
+- No source code changes
+- No dependency changes
+- No package-lock changes
+- No UI redesign
+- No folder restructuring
+
+## Verification
+Run:
+
+```bash
+npm run build
+ai context
+ai done
